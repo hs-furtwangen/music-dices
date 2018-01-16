@@ -1,9 +1,20 @@
 import * as soundworks from 'soundworks/client';
-import * as lfo from 'waves-lfo/client';
 import audioFiles from '../shared/audioFiles.js';
 import Dice from '../shared/Dice.js';
 
 const audioContext = soundworks.audioContext;
+
+const stillAccThreshold = 0.01;
+const stillDurationThreshold = 7.5;
+
+const freeFallAccLowThreshold = 0.01;
+const hitAccHighThreshold = 15;
+const freeFallDurationThreshold = 0.25;
+
+const freeTurnGyroHighThreshold = 20;
+const freeTurnGyroDiffLowThreshold = 0.1;
+const hitGyroLowThreshold = 0.1;
+const freeTurnDurationThreshold = 0.25;
 
 const template = `
   <div class="title">sensor</div>
@@ -61,6 +72,11 @@ class SensorExperience extends soundworks.Experience {
     this.edge = 0;
     this.gyroMag = 0;
 
+    this.holdsStill = false;
+    this.stillStartTime = Infinity;
+    this.freeFallStartTime = Infinity;
+    this.freeTurnStartTime = Infinity;
+
     this.onAcceleration = this.onAcceleration.bind(this);
     this.onAccelerationIncludingGravity = this.onAccelerationIncludingGravity.bind(this);
     this.onRotationRate = this.onRotationRate.bind(this);
@@ -87,67 +103,53 @@ class SensorExperience extends soundworks.Experience {
       this.motionInput.addListener('accelerationIncludingGravity', this.onAccelerationIncludingGravity);
       this.motionInput.addListener('rotationRate', this.onRotationRate);
 
-      const gyroPeriod = this.motionInput.getPeriod('rotationRate');
-      const eventIn = new lfo.source.EventIn({
-        frameType: 'scalar',
-        frameSize: 1,
-        frameRate: 1 / gyroPeriod,
-      });
-
-      const slicer = new lfo.operator.Slicer({
-        frameSize: 24,
-        hopSize: 4
-      });
-
-      const stats = new lfo.operator.MeanStddev();
-      const bridge = new lfo.sink.Bridge({
-        processFrame: (frame) => this.send('gyro-stats', frame.data[0], frame.data[1])
-      });
-
-      stats.connect(bridge);
-      slicer.connect(stats);
-      eventIn.connect(slicer);
-      eventIn.start();
-      this.eventIn = eventIn;
-
       this.sharedParams.addParamListener('mute-sensors', this.onMute);
       this.sharedParams.addParamListener('reload-sensors', this.onReload);
     });
   }
 
-  onRotationRate(data) {
-    const alpha = data[0];
-    const beta = data[1];
-    const gamma = data[2];
-    const mag = Math.sqrt(alpha * alpha + beta * beta + gamma * gamma);
-    const diff = mag - this.gyroMag;
-
-    this.gyroMag = mag;
-
-    const frame = {
-      time: audioContext.currentTime,
-      data: diff,
-    };
-
-    this.eventIn.processFrame(frame);
-  }
-
   onAcceleration(data) {
+    const now = audioContext.currentTime;
     const x = data[0];
     const y = data[1];
     const z = data[2];
     const mag = Math.sqrt(x * x + y * y + z * z);
+
+    this.send('print', 'acc mag', mag);
+
+    const isStill = mag < stillAccThreshold;
+    if (!isStill)
+      this.stillStartTime = now;
+    
+    const stillDuration = now - this.stillStartTime;
+    const holdsStill = stillDuration > stillDurationThreshold;
+
+    if (holdsStill !== this.holdsStill) {
+      this.send('still', holdsStill);
+      this.holdsStill = holdsStill;
+    }
   }
 
   onAccelerationIncludingGravity(data) {
+    const now = audioContext.currentTime;
     const filtered = this.accGravLowpass.input(data);
-    const x = filtered[0];
-    const y = filtered[1];
-    const z = filtered[2];
-    const absX = Math.abs(x);
-    const absY = Math.abs(y);
-    const absZ = Math.abs(z);
+    const filteredX = filtered[0];
+    const filteredY = filtered[1];
+    const filteredZ = filtered[2];
+    const absX = Math.abs(filteredX);
+    const absY = Math.abs(filteredY);
+    const absZ = Math.abs(filteredZ);
+    const mag = Math.sqrt(filteredX * filteredX + filteredY * filteredY + filteredZ * filteredZ);
     let e = 0;
+
+    const isFreeFall = (mag < freeFallAccLowThreshold);
+    if (!isFreeFall)
+      this.freeFallStartTime = now;
+    
+    const freeFallDuration = now - this.freeFallStartTime;
+
+    if (mag > hitAccHighThreshold && freeFallDuration > freeFallDurationThreshold)
+      this.send('acc-bumm');
 
     if (absX > absY && absX > absZ) {
       if (x > 0) {
@@ -180,6 +182,27 @@ class SensorExperience extends soundworks.Experience {
 
       this.edge = e;
     }
+  }
+
+  onRotationRate(data) {
+    const alpha = data[0];
+    const beta = data[1];
+    const gamma = data[2];
+    const mag = Math.sqrt(alpha * alpha + beta * beta + gamma * gamma);
+    const diff = Math.abs(mag - this.gyroMag);
+
+    this.gyroMag = mag;
+
+    //this.send('print', 'gyro', [mag, diff]);
+
+    const isFreeTurn = (mag > freeTurnGyroHighThreshold && diff <= 0 && -diff > freeTurnGyroDiffLowThreshold);
+    if (!isFreeTurn)
+      this.freeTurnStartTime = now;
+    
+    const freeTurnDuration = now - this.freeTurnStartTime;
+
+    if (mag < hitGyroLowThreshold && freeTurnDuration > freeTurnDurationThreshold)
+      this.send('gyro-bumm');
   }
 
   onStop(index) {
