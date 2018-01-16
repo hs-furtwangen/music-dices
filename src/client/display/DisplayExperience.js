@@ -24,7 +24,7 @@ class DisplayExperience extends soundworks.Experience {
 
     this.audioBufferManager = this.require('audio-buffer-manager', {
       assetsDomain: assetsDomain,
-      files: []//audioFiles,
+      files: audioFiles,
     });
 
     this.dices = [];
@@ -60,7 +60,7 @@ class DisplayExperience extends soundworks.Experience {
     const dice = this.dices[index];
 
     if (!this.isMuted && dice)
-      ;//dice.startSound(e);
+      dice.startSound(e);
 
     this.view.model.edge[index] = e;
     this.view.render('#edge');

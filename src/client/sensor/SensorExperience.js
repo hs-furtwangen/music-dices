@@ -50,7 +50,7 @@ class SensorExperience extends soundworks.Experience {
 
     this.audioBufferManager = this.require('audio-buffer-manager', {
       assetsDomain: assetsDomain,
-      files: [] //audioFiles,
+      files: audioFiles,
     });
 
     this.motionInput = this.require('motion-input', {
@@ -175,8 +175,8 @@ class SensorExperience extends soundworks.Experience {
 
       this.send('edge', e);
 
-      // if (!this.isMuted)
-      //   this.dice.startSound(e);
+      if (!this.isMuted)
+        this.dice.startSound(e);
 
       this.edge = e;
     }
