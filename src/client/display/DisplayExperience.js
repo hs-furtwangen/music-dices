@@ -4,11 +4,11 @@ import Dice from '../shared/Dice.js';
 
 const template = `
   <div class="title">display</div>
-  <div id="edge" class="center"><%= edge %></p></div>
+  <div id="edge" class="center"><%= edge[0] %> <%= edge[1] %> <%= edge[2] %></p></div>
 `;
 
 const model = {
-  edge: '',
+  edge: ['', '', ''],
 };
 
 const numDices = 3;
@@ -24,7 +24,7 @@ class DisplayExperience extends soundworks.Experience {
 
     this.audioBufferManager = this.require('audio-buffer-manager', {
       assetsDomain: assetsDomain,
-      files: audioFiles,
+      files: []//audioFiles,
     });
 
     this.dices = [];
@@ -60,9 +60,9 @@ class DisplayExperience extends soundworks.Experience {
     const dice = this.dices[index];
 
     if (!this.isMuted && dice)
-      dice.startSound(e);
+      ;//dice.startSound(e);
 
-    this.view.model.edge = e;
+    this.view.model.edge[index] = e;
     this.view.render('#edge');
   }
 

@@ -34,6 +34,7 @@ soundworks.server.setClientConfigDefinition((clientType, config, httpRequest) =>
 const sharedParams = soundworks.serviceManager.require('shared-params');
 sharedParams.addBoolean('mute-sensors', 'mute sensors', false, ['controller', 'sensor']);
 sharedParams.addBoolean('mute-display', 'mute display', false, ['controller', 'display']);
+sharedParams.addTrigger('reload-sensors', 'reload sensors', ['sensor']);
 
 const sensorExperience = new SensorExperience();
 const displayExperience = new DisplayExperience();

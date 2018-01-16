@@ -16,6 +16,7 @@ export default class SensorExperience extends soundworks.Experience {
     super.enter(client);
 
     this.receive(client, 'edge', this.getClientOnEdge(client));
+    this.receive(client, 'gyro-stats', this.getClientOnGyroStats(client));
   }
 
   exit(client) {
@@ -27,6 +28,12 @@ export default class SensorExperience extends soundworks.Experience {
   getClientOnEdge(client) {
     return (e) => {
       this.broadcast('display', null, 'edge', client.index, e);
+    };
+  }
+
+  getClientOnGyroStats(client) {
+    return (mean, stddev) => {
+      console.log("gyro stats:", mean, stddev);
     };
   }
 }
