@@ -32,12 +32,17 @@ soundworks.server.setClientConfigDefinition((clientType, config, httpRequest) =>
 });
 
 const sharedParams = soundworks.serviceManager.require('shared-params');
+sharedParams.addNumber('still-time', 'still time', 1, 15, 0.5, 20, ['controller', 'sensor']);
+sharedParams.addNumber('fadeout-time', 'fadeout time', 1, 7.5, 0.5, 20, ['controller']);
 sharedParams.addBoolean('mute-sensors', 'mute sensors', false, ['controller', 'sensor']);
 sharedParams.addBoolean('mute-display', 'mute display', false, ['controller', 'display']);
+sharedParams.addTrigger('stop-all', 'stop all', ['sensor, display']);
 sharedParams.addTrigger('reload-sensors', 'reload sensors', ['sensor']);
 
 const sensorExperience = new SensorExperience();
 const displayExperience = new DisplayExperience();
 const controllerExperience = new soundworks.ControllerExperience('controller');
+
+sharedParams.addParamListener('mute-sensors', (value) => sensorExperience.mutePrinting = value);
 
 soundworks.server.start();

@@ -4,17 +4,13 @@ import Dice from '../shared/Dice.js';
 
 const audioContext = soundworks.audioContext;
 
-const stillAccThreshold = 0.01;
-const stillDurationThreshold = 7.5;
-
-const freeFallAccLowThreshold = 0.01;
-const hitAccHighThreshold = 15;
-const freeFallDurationThreshold = 0.25;
-
-const freeTurnGyroHighThreshold = 20;
-const freeTurnGyroDiffLowThreshold = 0.1;
-const hitGyroLowThreshold = 0.1;
-const freeTurnDurationThreshold = 0.25;
+const stillAccLowThreshold = 0.4;
+const freeFallAccThreshold = 3;
+const freeFallDurationThreshold = 0.2;
+const freeTurnGyroHighThreshold = 200;
+const freeTurnGyroDiffLowThreshold = 0.02;
+const freeTurnDurationThreshold = 0.2;
+const interHitTimeHighThreshold = 0.5;
 
 const template = `
   <div class="title">sensor</div>
@@ -24,6 +20,10 @@ const template = `
 const model = {
   edge: '',
 };
+
+function getCurrentTime() {
+  return 0.001 * performance.now();
+}
 
 class Lowpass {
   constructor(period, cutoff = 10) {
@@ -53,7 +53,7 @@ class SensorExperience extends soundworks.Experience {
   constructor(assetsDomain) {
     super();
 
-    this.platform = this.require('platform');
+    this.platform = this.require('platform', { features: ['web-audio'], showDialog: true });
     this.sharedConfig = this.require('shared-config');
     this.sharedParams = this.require('shared-params');
     this.checkin = this.require('checkin');
@@ -65,7 +65,7 @@ class SensorExperience extends soundworks.Experience {
     });
 
     this.motionInput = this.require('motion-input', {
-      descriptors: ['accelerationIncludingGravity', 'rotationRate'],
+      descriptors: ['acceleration', 'accelerationIncludingGravity', 'rotationRate'],
     });
 
     this.dice = null;
@@ -76,12 +76,17 @@ class SensorExperience extends soundworks.Experience {
     this.stillStartTime = Infinity;
     this.freeFallStartTime = Infinity;
     this.freeTurnStartTime = Infinity;
+    this.hitTime = -Infinity;
+    this.offStillDuration = 15;
 
     this.onAcceleration = this.onAcceleration.bind(this);
     this.onAccelerationIncludingGravity = this.onAccelerationIncludingGravity.bind(this);
     this.onRotationRate = this.onRotationRate.bind(this);
-    this.onStop = this.onStop.bind(this);
+
+    this.onStillTime = this.onStillTime.bind(this);
     this.onMute = this.onMute.bind(this);
+    this.onStopAll = this.onStopAll.bind(this);
+    this.onReload = this.onReload.bind(this);
   }
 
   start() {
@@ -95,43 +100,74 @@ class SensorExperience extends soundworks.Experience {
     // as show can be async, we make sure that the view is actually rendered
     this.show().then(() => {
       const clientIndex = soundworks.client.index;
-      const buffers = this.audioBufferManager.data[clientIndex];
+      const loaderData = this.audioBufferManager.data;
+      const buffers = loaderData.sounds[clientIndex];
+      const duration = loaderData.duration;
+      const quantization = loaderData.quantization;
 
-      this.dice = new Dice(this.sync, buffers);
+      this.dice = new Dice(this.sync, buffers, duration, quantization);
+
+      this.receive('stop-all', this.onStopAll);
 
       this.motionInput.addListener('acceleration', this.onAcceleration);
       this.motionInput.addListener('accelerationIncludingGravity', this.onAccelerationIncludingGravity);
       this.motionInput.addListener('rotationRate', this.onRotationRate);
 
+      this.sharedParams.addParamListener('still-time', this.onStillTime);      
       this.sharedParams.addParamListener('mute-sensors', this.onMute);
+      this.sharedParams.addParamListener('stop-all', this.onStopAll);
       this.sharedParams.addParamListener('reload-sensors', this.onReload);
     });
   }
 
   onAcceleration(data) {
-    const now = audioContext.currentTime;
+    const now = getCurrentTime();
     const x = data[0];
     const y = data[1];
     const z = data[2];
     const mag = Math.sqrt(x * x + y * y + z * z);
+    const isStill = mag < stillAccLowThreshold;
+    const stillDuration = now - this.stillStartTime;
+    const holdsStill = stillDuration > this.offStillDuration;
 
-    this.send('print', 'acc mag', mag);
+    // this.send('print', 'acc mag', [mag, stillDuration]);
 
-    const isStill = mag < stillAccThreshold;
     if (!isStill)
       this.stillStartTime = now;
-    
-    const stillDuration = now - this.stillStartTime;
-    const holdsStill = stillDuration > stillDurationThreshold;
 
     if (holdsStill !== this.holdsStill) {
-      this.send('still', holdsStill);
+      if (holdsStill)
+        this.send('still');
+
       this.holdsStill = holdsStill;
     }
   }
 
   onAccelerationIncludingGravity(data) {
-    const now = audioContext.currentTime;
+    const now = getCurrentTime();
+    const x = data[0];
+    const y = data[1];
+    const z = data[2];
+    const mag = Math.sqrt(x * x + y * y + z * z);
+    const isFreeFall = (mag <= freeFallAccThreshold);
+    const freeFallDuration = now - this.freeFallStartTime;
+
+    // this.send('print', (isFreeFall) ? '---> FREE FALL!' : '           accG', [mag.toFixed(2), freeFallDuration.toFixed(3)]);
+
+    if (!isFreeFall) {
+      const timeSinceLastHit = now - this.hitTime;
+      if (freeFallDuration > freeFallDurationThreshold && timeSinceLastHit > interHitTimeHighThreshold) {
+
+        if (!this.isMuted)
+          this.dice.start();
+
+        this.send('start');
+        this.hitTime = now;
+      }
+
+      this.freeFallStartTime = now;
+    }
+
     const filtered = this.accGravLowpass.input(data);
     const filteredX = filtered[0];
     const filteredY = filtered[1];
@@ -139,32 +175,22 @@ class SensorExperience extends soundworks.Experience {
     const absX = Math.abs(filteredX);
     const absY = Math.abs(filteredY);
     const absZ = Math.abs(filteredZ);
-    const mag = Math.sqrt(filteredX * filteredX + filteredY * filteredY + filteredZ * filteredZ);
     let e = 0;
 
-    const isFreeFall = (mag < freeFallAccLowThreshold);
-    if (!isFreeFall)
-      this.freeFallStartTime = now;
-    
-    const freeFallDuration = now - this.freeFallStartTime;
-
-    if (mag > hitAccHighThreshold && freeFallDuration > freeFallDurationThreshold)
-      this.send('acc-bumm');
-
     if (absX > absY && absX > absZ) {
-      if (x > 0) {
+      if (filteredX > 0) {
         e = 5;
       } else {
         e = 2;
       }
     } else if (absY > absX && absY > absZ) {
-      if (y > 0) {
+      if (filteredY > 0) {
         e = 1;
       } else {
         e = 6;
       }
     } else if (absZ > absX && absZ > absY) {
-      if (z > 0) {
+      if (filteredZ > 0) {
         e = 3;
       } else {
         e = 4;
@@ -176,46 +202,55 @@ class SensorExperience extends soundworks.Experience {
       this.view.render('#edge');
 
       this.send('edge', e);
-
-      if (!this.isMuted)
-        this.dice.startSound(e);
-
+      this.dice.edge = e;
       this.edge = e;
     }
   }
 
   onRotationRate(data) {
+    const now = getCurrentTime();
     const alpha = data[0];
     const beta = data[1];
     const gamma = data[2];
     const mag = Math.sqrt(alpha * alpha + beta * beta + gamma * gamma);
-    const diff = Math.abs(mag - this.gyroMag);
-
-    this.gyroMag = mag;
-
-    //this.send('print', 'gyro', [mag, diff]);
-
-    const isFreeTurn = (mag > freeTurnGyroHighThreshold && diff <= 0 && -diff > freeTurnGyroDiffLowThreshold);
-    if (!isFreeTurn)
-      this.freeTurnStartTime = now;
-    
+    const diff = Math.abs(mag - this.gyroMag) / mag;
+    const isFreeTurn = (mag > freeTurnGyroHighThreshold && diff < freeTurnGyroDiffLowThreshold);
     const freeTurnDuration = now - this.freeTurnStartTime;
 
-    if (mag < hitGyroLowThreshold && freeTurnDuration > freeTurnDurationThreshold)
-      this.send('gyro-bumm');
-  }
+    // this.send('print', (isFreeTurn)? '---> FREE TURN!': '           gyro', [mag.toFixed(2), diff.toFixed(4), freeTurnDuration.toFixed(3)]);
 
-  onStop(index) {
-    this.dice.stopSound();
+    if (!isFreeTurn) {
+      const timeSinceLastHit = now - this.hitTime;
+
+      if (freeTurnDuration > freeTurnDurationThreshold && timeSinceLastHit > interHitTimeHighThreshold) {
+        if (!this.isMuted)
+          this.dice.start();
+
+        this.send('start');
+        this.hitTime = now;
+      }
+
+      this.freeTurnStartTime = now;
+    }
+
+    this.gyroMag = mag;
   }
 
   onMute(mute) {
     if (mute !== this.isMuted) {
       if (mute)
-        this.dice.stopSound();
+        this.dice.stop();
 
       this.isMuted = mute;
     }
+  }
+
+  onStillTime(value) {
+    this.offStillDuration = value;
+  }
+
+  onStopAll(releaseTime = 1) {
+    this.dice.stop(releaseTime);
   }
 
   onReload() {

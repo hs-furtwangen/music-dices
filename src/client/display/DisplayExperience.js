@@ -8,7 +8,7 @@ const template = `
 `;
 
 const model = {
-  edge: ['', '', ''],
+  edge: ['-', '-', '-'],
 };
 
 const numDices = 3;
@@ -31,8 +31,10 @@ class DisplayExperience extends soundworks.Experience {
     this.isMuted = false;
 
     this.onEdge = this.onEdge.bind(this);
-    this.onStop = this.onStop.bind(this);
+    this.onStart = this.onStart.bind(this);
+    this.onExit = this.onExit.bind(this);
     this.onMute = this.onMute.bind(this);
+    this.onStopAll = this.onStopAll.bind(this);
   }
 
   start() {
@@ -43,50 +45,68 @@ class DisplayExperience extends soundworks.Experience {
 
     // as show can be async, we make sure that the view is actually rendered
     this.show().then(() => {
+      const loaderData = this.audioBufferManager.data;
+      const duration = loaderData.duration;
+      const quantization = loaderData.quantization;
+
       for (let i = 0; i < numDices; i++) {
-        const buffers = this.audioBufferManager.data[i];
-        const dice = new Dice(this.sync, buffers);
+        const buffers = loaderData.sounds[i];
+        const dice = new Dice(this.sync, buffers, duration, quantization);
+
         this.dices.push(dice);
       }
 
       this.receive('edge', this.onEdge);
-      this.receive('stop', this.onStop);
+      this.receive('start', this.onStart);
+      this.receive('exit', this.onExit);
+      this.receive('stop-all', this.onStopAll);
 
       this.sharedParams.addParamListener('mute-display', this.onMute);
+      this.sharedParams.addParamListener('stop-all', this.onStopAll);
     });
   }
 
   onEdge(index, e) {
     const dice = this.dices[index];
 
-    if (!this.isMuted && dice)
-      dice.startSound(e);
+    if (dice)
+      dice.edge = e;
 
     this.view.model.edge[index] = e;
     this.view.render('#edge');
   }
 
-  onStop(index) {
-    if (index !== undefined) {
-      const dice = this.dices[index];
+  onStart(index) {
+    const dice = this.dices[index];
 
-      if (dice)
-        dice.stopSound();
-    } else {
-      for (let dice of this.dices)
-        dice.stopSound();
-    }
+    if (dice && !this.isMuted)
+      dice.start();
+  }
+
+  onExit(index) {
+    const dice = this.dices[index];
+
+    if (dice)
+      dice.stop();
+
+    this.view.model.edge[index] = '-';
+    this.view.render('#edge');
   }
 
   onMute(mute) {
     if (mute !== this.isMuted) {
       if (mute) {
         for (let dice of this.dices)
-          dice.stopSound();
+          dice.stop();
       }
 
       this.isMuted = mute;
     }
+  }
+
+  onStopAll(releaseTime = 1) {
+    for (let dice of this.dices)
+      dice.stop(releaseTime);
   }
 }
 
