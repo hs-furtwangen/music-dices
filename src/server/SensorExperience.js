@@ -38,6 +38,25 @@ export default class SensorExperience extends soundworks.Experience {
   setClientStill(index, still) {
     let numStillClients = 0;
 
+    this.stillClients[index] = still;
+
+    for (let clientStill of this.stillClients)
+      numStillClients += clientStill;
+
+    const allClientsStill = (numStillClients >= this.clients.length);
+
+    // console.log('still:', this.stillClients, allClientsStill, still);
+
+    if (allClientsStill) {
+      // console.log('---> all still:', this.stillClients);
+
+      this.broadcast(['sensor', 'display'], null, 'stop-all', this.fadeoutTime);
+    }
+  }
+
+  setClientStart(index) {
+    let numStillClients = 0;
+
     for (let still of this.stillClients)
       numStillClients += still;
 
@@ -45,20 +64,13 @@ export default class SensorExperience extends soundworks.Experience {
 
     // console.log('still:', this.stillClients, allClientsStill, still);
 
-    if (still && !allClientsStill) {
-      for (let i = 0; i < this.stillClients.length; i++)
-        this.stillClients[i] = true;
-
-      // console.log('---> all still:', this.stillClients);
-
-      this.broadcast(['sensor', 'display'], null, 'stop-all', this.fadeoutTime);
-    } else if (!still && allClientsStill) {
+    if (allClientsStill) {
       for (let i = 0; i < this.stillClients.length; i++)
         this.stillClients[i] = false;
 
       // console.log('---> nothing still:', this.stillClients);
     } else {
-      this.stillClients[index] = still;
+      this.stillClients[index] = false;
 
       // console.log('---> still:', this.stillClients);
     }
@@ -81,12 +93,12 @@ export default class SensorExperience extends soundworks.Experience {
   getClientOnStart(client) {
     return () => {
       this.broadcast('display', null, 'start', client.index);
-      this.setClientStill(client.index, false);
+      this.setClientStart(client.index);
     };
   }
 
   getClientOnStill(client) {
-    return () => {
+    return (isStill) => {
       this.setClientStill(client.index, true);
     };
   }

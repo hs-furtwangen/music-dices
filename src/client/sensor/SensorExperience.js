@@ -136,9 +136,7 @@ class SensorExperience extends soundworks.Experience {
       this.stillStartTime = now;
 
     if (holdsStill !== this.holdsStill) {
-      if (holdsStill)
-        this.send('still');
-
+      this.send('still', holdsStill);
       this.holdsStill = holdsStill;
     }
   }
