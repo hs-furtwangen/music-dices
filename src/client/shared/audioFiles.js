@@ -1,26 +1,36 @@
-export default [
-  [
-    'sounds/DiceDrums1.wav',
-    'sounds/DiceDrums2.wav',
-    'sounds/DiceDrums3.wav',
-    'sounds/DiceDrums4.wav',
-    'sounds/DiceDrums5.wav',
-    'sounds/DiceDrums6.wav',
-  ],
-  [
-    'sounds/DiceLead1.wav',
-    'sounds/DiceLead2.wav',
-    'sounds/DiceLead3.wav',
-    'sounds/DiceLead4.wav',
-    'sounds/DiceLead5.wav',
-    'sounds/DiceLead6.wav',
-  ],
-  [
-    'sounds/DiceRhythm1.wav',
-    'sounds/DiceRhythm2.wav',
-    'sounds/DiceRhythm3.wav',
-    'sounds/DiceRhythm4.wav',
-    'sounds/DiceRhythm5.wav',
-    'sounds/DiceRhythm6.wav',
-  ],
-];
+const tempo = 128;
+const ticksPerMeasure = 16;
+const measuresInPattern = 4;
+const quantization = 60 / (tempo * ticksPerMeasure);
+const duration = quantization * ticksPerMeasure * ticksPerMeasure;
+
+export default {
+  duration: duration,
+  quantization: quantization,
+  sounds: [
+    [
+      'sounds/drums-1.wav',
+      'sounds/drums-2.wav',
+      'sounds/drums-3.wav',
+      'sounds/drums-4.wav',
+      'sounds/drums-5.wav',
+      'sounds/drums-6.wav',
+    ],
+    [
+      'sounds/lead-1.wav',
+      'sounds/lead-2.wav',
+      'sounds/lead-3.wav',
+      'sounds/lead-4.wav',
+      'sounds/lead-5.wav',
+      'sounds/lead-6.wav',
+    ],
+    [
+      'sounds/rhythm-1.wav',
+      'sounds/rhythm-2.wav',
+      'sounds/rhythm-3.wav',
+      'sounds/rhythm-4.wav',
+      'sounds/rhythm-5.wav',
+      'sounds/rhythm-6.wav',
+    ],
+  ]
+};
