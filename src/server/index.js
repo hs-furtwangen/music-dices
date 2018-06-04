@@ -34,6 +34,11 @@ soundworks.server.setClientConfigDefinition((clientType, config, httpRequest) =>
 const sharedParams = soundworks.serviceManager.require('shared-params');
 sharedParams.addNumber('still-time', 'still time', 1, 20, 0.5, 15, ['controller', 'sensor']);
 sharedParams.addNumber('fadeout-time', 'fadeout time', 1, 20, 0.5, 7.5, ['controller']);
+sharedParams.addNumber('sensor-delay', 'sensor delay', 0, 0.25, 0.001, 0, ['controller', 'sensor']);
+sharedParams.addNumber('display-1-gain', 'drum gain', -24, 24, 1, 0, ['controller', 'display']);
+sharedParams.addNumber('display-2-gain', 'lead gain', -24, 24, 1, 0, ['controller', 'display']);
+sharedParams.addNumber('display-3-gain', 'rhythm gain', -24, 24, 1, 0, ['controller', 'display']);
+sharedParams.addNumber('sensor-gain', 'sensor gain', -48, 48, 1, 0, ['controller', 'sensor']);
 sharedParams.addBoolean('mute-sensors', 'mute sensors', false, ['controller', 'sensor']);
 sharedParams.addBoolean('mute-display', 'mute display', false, ['controller', 'display']);
 sharedParams.addTrigger('stop-all', 'stop all', ['sensor, display']);

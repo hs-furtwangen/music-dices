@@ -105,7 +105,14 @@ class SensorExperience extends soundworks.Experience {
       const duration = loaderData.duration;
       const quantization = loaderData.quantization;
 
-      this.dice = new Dice(this.sync, buffers, duration, quantization);
+      const highpass = audioContext.createBiquadFilter();
+      highpass.connect(audioContext.destination);
+      highpass.type = 'highpass';
+      highpass.frequency.value = 400;
+      highpass.Q.value = 0;
+
+      this.dice = new Dice(this.sync, buffers, duration, quantization, highpass);
+      this.dice.level = 24;
 
       this.receive('stop-all', this.onStopAll);
 
@@ -113,7 +120,9 @@ class SensorExperience extends soundworks.Experience {
       this.motionInput.addListener('accelerationIncludingGravity', this.onAccelerationIncludingGravity);
       this.motionInput.addListener('rotationRate', this.onRotationRate);
 
-      this.sharedParams.addParamListener('still-time', this.onStillTime);      
+      this.sharedParams.addParamListener('still-time', this.onStillTime);
+      this.sharedParams.addParamListener('sensor-delay', (value) => this.dice.delay = value);
+      this.sharedParams.addParamListener('sensor-gain', (value) => this.dice.level = value);
       this.sharedParams.addParamListener('mute-sensors', this.onMute);
       this.sharedParams.addParamListener('stop-all', this.onStopAll);
       this.sharedParams.addParamListener('reload-sensors', this.onReload);

@@ -52,7 +52,6 @@ class DisplayExperience extends soundworks.Experience {
       for (let i = 0; i < numDices; i++) {
         const buffers = loaderData.sounds[i];
         const dice = new Dice(this.sync, buffers, duration, quantization);
-
         this.dices.push(dice);
       }
 
@@ -61,6 +60,9 @@ class DisplayExperience extends soundworks.Experience {
       this.receive('exit', this.onExit);
       this.receive('stop-all', this.onStopAll);
 
+      this.sharedParams.addParamListener(`display-1-gain`, (value) => this.dices[0].level = value);
+      this.sharedParams.addParamListener(`display-2-gain`, (value) => this.dices[1].level = value);
+      this.sharedParams.addParamListener(`display-3-gain`, (value) => this.dices[2].level = value);
       this.sharedParams.addParamListener('mute-display', this.onMute);
       this.sharedParams.addParamListener('stop-all', this.onStopAll);
     });

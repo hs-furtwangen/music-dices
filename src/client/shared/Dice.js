@@ -1,5 +1,5 @@
 import * as soundworks from 'soundworks/client';
-import { centToLinear } from 'soundworks/utils/math';
+import { centToLinear, decibelToLinear } from 'soundworks/utils/math';
 
 const audioContext = soundworks.audioContext;
 
@@ -12,11 +12,14 @@ const defaultMetrics = {
 };
 
 class Dice {
-  constructor(sync, buffers, duration, quantization) {
+  constructor(sync, buffers, duration, quantization, destination = audioContext.destination) {
     this.sync = sync;
     this.buffers = buffers;
     this.duration = duration;
     this.quantization = quantization;
+    this.destination = destination;
+    this.delay = 0;
+    this.amp = 1;
 
     this.bufferSource = null;
     this.gain = null;
@@ -30,7 +33,7 @@ class Dice {
     const syncTime = this.sync.getSyncTime(audioTime);
     const numTicks = Math.ceil(syncTime / this.quantization);
     const quantizedSyncTime = numTicks * this.quantization;
-    const quantizedAudioTime = this.sync.getAudioTime(quantizedSyncTime);
+    const quantizedAudioTime = this.sync.getAudioTime(quantizedSyncTime) + this.delay;
     const startTime = quantizedSyncTime % this.duration; // start time within pattern
     let bufferSource = this.bufferSource;
     let gain = this.gain;
@@ -38,10 +41,10 @@ class Dice {
     this._stopSound(quantizedAudioTime, attackTime);
 
     gain = audioContext.createGain();
-    gain.connect(audioContext.destination);
+    gain.connect(this.destination);
     gain.gain.value = 0;
     gain.gain.setValueAtTime(0, quantizedAudioTime);
-    gain.gain.linearRampToValueAtTime(1, quantizedAudioTime + attackTime);
+    gain.gain.linearRampToValueAtTime(this.amp, quantizedAudioTime + attackTime);
 
     bufferSource = audioContext.createBufferSource();
     bufferSource.connect(gain);
@@ -67,7 +70,7 @@ class Dice {
       if (audioTime > this.releaseStart)
         ratio = (audioTime - this.releaseStart) / (this.releaseEnd - this.releaseStart);
 
-      const value = 1 - ratio;
+      const factor = 1 - ratio;
       const bufferSource = this.bufferSource;
       const gain = this.gain;
 
@@ -76,7 +79,7 @@ class Dice {
         this.bufferSource = null;
       }
 
-      gain.gain.setValueAtTime(value, audioTime);
+      gain.gain.setValueAtTime(factor * this.amp, audioTime);
       gain.gain.linearRampToValueAtTime(0, releaseEnd);
 
       this.releaseStart = audioTime - ratio * releaseTime;
@@ -102,6 +105,10 @@ class Dice {
 
   get edge() {
     return this._edge;
+  }
+
+  set level(value) {
+    this.amp = decibelToLinear(value);
   }
 
   start() {
