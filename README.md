@@ -2,7 +2,7 @@
 
 To install the application (requires `node.js` and optionally `git`):
 * check out the repository using `git` or download and unzip the code
-* open a shell/terminal and change the current directory to the downloaded (unzipped) `GemMus-2018` project directory
+* open a shell/terminal and change the current directory to the downloaded (unzipped) `music-dices` project directory
 * run `npm install`
 
 To run the application:
