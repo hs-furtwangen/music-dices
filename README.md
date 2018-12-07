@@ -6,8 +6,11 @@ To install the application (requires `node.js` and optionally `git`):
 * run `npm install`
 
 To run the application:
-* run `npm run watch` in the `GemMus-2018` project directory in an open a shell/terminal
-* to start a `player` client, open the URL `localhost:8000` in your browser
+* run `npm run watch` in the `music-dices` project directory in an open a shell/terminal
+* to start a `sensor` client, open the URL `localhost:8000/sensor` in your browser
+* to start the `display` client, open the URL `localhost:8000/display` in your browser
 * to start the `controller` client, open the URL `localhost:8000/controller` in your browser
 
-To run the `sensor` client on your mobile device you have to connect to the same network as the server and open `<server address>:8000/sensor` in a browser on the mobile device. For the `display`-client use `<server address>:8000/display`. The controller-client allows for changeing some parameters `<server address>:8000/controller`.
+The `sensor`-client is designed to run on a mobile device (e.g. smartphone or iPod) inside the foam dices. 
+The `display`-client5 is connected to a public stereo audio system.
+The `controller`-client allows for changeing some parameters `<server address>:8000/controller`.
